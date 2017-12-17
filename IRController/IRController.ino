@@ -19,10 +19,16 @@
 
 // User settings are below here
 
-const bool getExternalIP = false;                               // Set to false to disable querying external IP
+const bool getExternalIP = false;                             // Set to false to disable querying external IP
 
-const bool getTime = true;                                     // Set to false to disable querying for the time
-const int timeOffset = -14400;                                 // Timezone offset in seconds
+const bool getTime = true;                                    // Set to false to disable querying for the time
+const int timeOffset = -14400;                                // Timezone offset in seconds
+
+int pinr1 = 14;                                               // Receiving pin
+int pins1 = 4;                                                // Transmitting preset 1
+int pins2 = 5;                                                // Transmitting preset 2
+int pins3 = 12;                                               // Transmitting preset 3
+int pins4 = 13;                                               // Transmitting preset 4
 
 // User settings are above here
 
@@ -51,12 +57,6 @@ Ticker ticker;
 bool shouldSaveConfig = false;                                // Flag for saving data
 bool holdReceive = false;                                     // Flag to prevent IR receiving while transmitting
 
-int pinr1 = 14;                                               // Receiving pin
-int pins1 = 4;                                                // Transmitting preset 1
-int pins2 = 5;                                                // Transmitting preset 2
-int pins3 = 12;                                               // Transmitting preset 3
-int pins4 = 13;                                               // Transmitting preset 4
-
 IRrecv irrecv(pinr1);
 IRsend irsend1(pins1);
 IRsend irsend2(pins2);
@@ -67,7 +67,7 @@ const unsigned long resetfrequency = 259200000;                // 72 hours in mi
 const char* poolServerName = "time.nist.gov";
 
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, poolServerName, timeOffset, 3600000);
+NTPClient timeClient(ntpUDP, poolServerName, timeOffset, 1800000);
 
 char _ip[16] = "";
 
@@ -297,6 +297,8 @@ bool setupWifi(bool resetConf) {
   if (resetConf)
     wifiManager.resetSettings();
 
+  WiFi.hostname().toCharArray(host_name, 20);
+
   // set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
   wifiManager.setAPCallback(configModeCallback);
   // set config save notify callback
@@ -343,8 +345,6 @@ bool setupWifi(bool resetConf) {
     Serial.println("failed to mount FS");
   }
 
-
-  WiFi.hostname().toCharArray(host_name, 20);
   WiFiManagerParameter custom_hostname("hostname", "Choose a hostname to this IR Controller", host_name, 20);
   wifiManager.addParameter(&custom_hostname);
   WiFiManagerParameter custom_passcode("passcode", "Choose a passcode", passcode, 20);
