@@ -19,7 +19,7 @@
 
 // User settings are below here
 
-const bool getExternalIP = false;                             // Set to false to disable querying external IP
+const bool getExternalIP = true;                             // Set to false to disable querying external IP
 
 const bool getTime = true;                                    // Set to false to disable querying for the time
 const int timeOffset = -14400;                                // Timezone offset in seconds
@@ -297,8 +297,6 @@ bool setupWifi(bool resetConf) {
   if (resetConf)
     wifiManager.resetSettings();
 
-  WiFi.hostname().toCharArray(host_name, 20);
-
   // set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
   wifiManager.setAPCallback(configModeCallback);
   // set config save notify callback
@@ -437,7 +435,12 @@ void setup() {
   if (!setupWifi(digitalRead(configpin) == LOW))
     return;
 
-  WiFi.hostname(host_name);
+  if (strlen(host_name) > 0) {
+    WiFi.hostname(host_name);
+  } else {
+    WiFi.hostname().toCharArray(host_name, 20);
+  }
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -494,6 +497,7 @@ void setup() {
     String epid = server.arg("epid");
     String mid = server.arg("mid");
     String timestamp = server.arg("time");
+    int out = (server.hasArg("out")) ? server.arg("out").toInt() : 1;
 
     if (!root.success()) {
       Serial.println("JSON parsing failed");
@@ -558,7 +562,10 @@ void setup() {
         int pulse = root[x]["pulse"];
         int pdelay = root[x]["pdelay"];
         int repeat = root[x]["repeat"];
-        int out = root[x]["out"];
+        int xout = root[x]["out"];
+        if (xout == 0) {
+          xout = out;
+        }
         int duty = root[x]["duty"];
 
         if (pulse <= 0) pulse = 1; // Make sure pulse isn't 0
@@ -593,7 +600,7 @@ void setup() {
           JsonArray &raw = root[x]["data"]; // Array of unsigned int values for the raw signal
           int khz = root[x]["khz"];
           if (khz <= 0) khz = 38; // Default to 38khz if not set
-          rawblast(raw, khz, rdelay, pulse, pdelay, repeat, pickIRsend(out),duty);
+          rawblast(raw, khz, rdelay, pulse, pdelay, repeat, pickIRsend(xout),duty);
         } else if (type == "roku") {
           String data = root[x]["data"];
           rokuCommand(ip, data);
@@ -602,7 +609,7 @@ void setup() {
           String addressString = root[x]["address"];
           long address = strtoul(addressString.c_str(), 0, 0);
           int len = root[x]["length"];
-          irblast(type, data, len, rdelay, pulse, pdelay, repeat, address, pickIRsend(out));
+          irblast(type, data, len, rdelay, pulse, pdelay, repeat, address, pickIRsend(xout));
         }
       }
 
@@ -681,7 +688,7 @@ void setup() {
       int pulse = (server.hasArg("pulse")) ? server.arg("pulse").toInt() : 1;
       int pdelay = (server.hasArg("pdelay")) ? server.arg("pdelay").toInt() : 100;
       int repeat = (server.hasArg("repeat")) ? server.arg("repeat").toInt() : 1;
-      int out = (server.hasArg("out")) ? server.arg("out").toInt() : 0;
+      int out = (server.hasArg("out")) ? server.arg("out").toInt() : 1;
       if (server.hasArg("code")) {
         String code = server.arg("code");
         char separator = ':';
@@ -807,8 +814,6 @@ IRsend pickIRsend (int out) {
 //+=============================================================================
 // Display encoding type
 //
-// Display encoding type
-//
 String encoding(decode_results *results) {
   String output;
   switch (results->decode_type) {
@@ -831,6 +836,7 @@ String encoding(decode_results *results) {
     case PANASONIC:    output = "PANASONIC";          break;
     case DENON:        output = "DENON";              break;
     case COOLIX:       output = "COOLIX";             break;
+    case GREE:         output = "GREE";               break;
   }
   return output;
   if (results->repeat) Serial.print(" (Repeat)");
@@ -870,10 +876,10 @@ void fullCode (decode_results *results)
   Serial.print(encoding(results));
   Serial.print(":");
   Serial.print(results->bits, DEC);
-  if (results->overflow)
-    Serial.println("WARNING: IR code too long."
-                   "Edit IRrecv.h and increase RAWBUF");
   Serial.println("");
+  if (results->overflow)
+    Serial.println("WARNING: IR code too long. "
+                   "Edit IRrecv.h and increase RAWBUF");
 }
 
 //+=============================================================================
@@ -980,11 +986,11 @@ void sendHomePage(String message, String header, int type, int httpcode) {
   if (last_recv_2.valid)
   server.sendContent("              <tr class='text-uppercase'><td><a href='/received?id=2'>" + String(last_recv_2.timestamp) + "</a></td><td><code>" + String(last_recv_2.data) + "</code></td><td><code>" + String(last_recv_2.encoding) + "</code></td><td><code>" + String(last_recv_2.bits) + "</code></td><td><code>" + String(last_recv_2.address) + "</code></td></tr>\n");
   if (last_recv_3.valid)
-  server.sendContent("              <tr class='text-uppercase'><td><a href='/received?id=2'>" + String(last_recv_3.timestamp) + "</a></td><td><code>" + String(last_recv_3.data) + "</code></td><td><code>" + String(last_recv_3.encoding) + "</code></td><td><code>" + String(last_recv_3.bits) + "</code></td><td><code>" + String(last_recv_3.address) + "</code></td></tr>\n");
+  server.sendContent("              <tr class='text-uppercase'><td><a href='/received?id=3'>" + String(last_recv_3.timestamp) + "</a></td><td><code>" + String(last_recv_3.data) + "</code></td><td><code>" + String(last_recv_3.encoding) + "</code></td><td><code>" + String(last_recv_3.bits) + "</code></td><td><code>" + String(last_recv_3.address) + "</code></td></tr>\n");
   if (last_recv_4.valid)
-  server.sendContent("              <tr class='text-uppercase'><td><a href='/received?id=2'>" + String(last_recv_4.timestamp) + "</a></td><td><code>" + String(last_recv_4.data) + "</code></td><td><code>" + String(last_recv_4.encoding) + "</code></td><td><code>" + String(last_recv_4.bits) + "</code></td><td><code>" + String(last_recv_4.address) + "</code></td></tr>\n");
+  server.sendContent("              <tr class='text-uppercase'><td><a href='/received?id=4'>" + String(last_recv_4.timestamp) + "</a></td><td><code>" + String(last_recv_4.data) + "</code></td><td><code>" + String(last_recv_4.encoding) + "</code></td><td><code>" + String(last_recv_4.bits) + "</code></td><td><code>" + String(last_recv_4.address) + "</code></td></tr>\n");
   if (last_recv_5.valid)
-  server.sendContent("              <tr class='text-uppercase'><td><a href='/received?id=2'>" + String(last_recv_5.timestamp) + "</a></td><td><code>" + String(last_recv_5.data) + "</code></td><td><code>" + String(last_recv_5.encoding) + "</code></td><td><code>" + String(last_recv_5.bits) + "</code></td><td><code>" + String(last_recv_5.address) + "</code></td></tr>\n");
+  server.sendContent("              <tr class='text-uppercase'><td><a href='/received?id=5'>" + String(last_recv_5.timestamp) + "</a></td><td><code>" + String(last_recv_5.data) + "</code></td><td><code>" + String(last_recv_5.encoding) + "</code></td><td><code>" + String(last_recv_5.bits) + "</code></td><td><code>" + String(last_recv_5.address) + "</code></td></tr>\n");
   if (!last_recv.valid && !last_recv_2.valid && !last_recv_3.valid && !last_recv_4.valid && !last_recv_5.valid)
   server.sendContent("              <tr><td colspan='5' class='text-center'><em>No codes received</em></td></tr>");
   server.sendContent("            </tbody></table>\n");
@@ -1034,16 +1040,34 @@ void sendCodePage(Code selCode, int httpcode){
   server.sendContent("        <div class='col-md-12'>\n");
   server.sendContent("          <div class='alert alert-warning'>Don't forget to add your passcode to the URLs below if you set one</div>\n");
   server.sendContent("      </div></div>\n");
-  if (selCode.encoding == "UNKNOWN") {
+  if (String(selCode.encoding) == "UNKNOWN") {
   server.sendContent("      <div class='row'>\n");
   server.sendContent("        <div class='col-md-12'>\n");
   server.sendContent("          <ul class='list-unstyled'>\n");
   server.sendContent("            <li>Hostname <span class='label label-default'>JSON</span></li>\n");
-  server.sendContent("            <li><pre>http://" + String(host_name) + ".local:" + String(port) + "/json?plain=[{'data':[" + String(selCode.raw) + "], 'type':'raw', 'khz':38}]</pre></li>\n");
+  server.sendContent("            <li><pre>http://" + String(host_name) + ".local:" + String(port) + "/json?plain=[{'data':[" + String(selCode.raw) + "],'type':'raw','khz':38}]</pre></li>\n");
   server.sendContent("            <li>Local IP <span class='label label-default'>JSON</span></li>\n");
-  server.sendContent("            <li><pre>http://" + WiFi.localIP().toString() + ":" + String(port) + "/json?plain=[{'data':[" + String(selCode.raw) + "], 'type':'raw', 'khz':38}]</pre></li>\n");
+  server.sendContent("            <li><pre>http://" + WiFi.localIP().toString() + ":" + String(port) + "/json?plain=[{'data':[" + String(selCode.raw) + "],'type':'raw','khz':38}]</pre></li>\n");
   server.sendContent("            <li>External IP <span class='label label-default'>JSON</span></li>\n");
-  server.sendContent("            <li><pre>http://" + externalIP() + ":" + String(port) + "/json?plain=[{'data':[" + String(selCode.raw) + "], 'type':'raw', 'khz':38}]</pre></li></ul>\n");
+  server.sendContent("            <li><pre>http://" + externalIP() + ":" + String(port) + "/json?plain=[{'data':[" + String(selCode.raw) + "],'type':'raw','khz':38}]</pre></li></ul>\n");
+  } else if (String(selCode.encoding) == "PANASONIC") {
+  //} else if (strtoul(selCode.address, 0, 0) > 0) {
+  server.sendContent("      <div class='row'>\n");
+  server.sendContent("        <div class='col-md-12'>\n");
+  server.sendContent("          <ul class='list-unstyled'>\n");
+  server.sendContent("            <li>Hostname <span class='label label-default'>MSG</span></li>\n");
+  server.sendContent("            <li><pre>http://" + String(host_name) + ".local:" + String(port) + "/msg?code=" + String(selCode.data) + ":" + String(selCode.encoding) + ":" + String(selCode.bits) + "&address=" + String(selCode.address) + "</pre></li>\n");
+  server.sendContent("            <li>Local IP <span class='label label-default'>MSG</span></li>\n");
+  server.sendContent("            <li><pre>http://" + WiFi.localIP().toString() + ":" + String(port) + "/msg?code=" + String(selCode.data) + ":" + String(selCode.encoding) + ":" + String(selCode.bits) + "&address=" + String(selCode.address) + "</pre></li>\n");
+  server.sendContent("            <li>External IP <span class='label label-default'>MSG</span></li>\n");
+  server.sendContent("            <li><pre>http://" + externalIP() + ":" + String(port) + "/msg?code=" + selCode.data + ":" + String(selCode.encoding) + ":" + String(selCode.bits) + "&address=" + String(selCode.address) + "</pre></li></ul>\n");
+  server.sendContent("          <ul class='list-unstyled'>\n");
+  server.sendContent("            <li>Hostname <span class='label label-default'>JSON</span></li>\n");
+  server.sendContent("            <li><pre>http://" + String(host_name) + ".local:" + String(port) + "/json?plain=[{'data':'" + String(selCode.data) + "','type':'" + String(selCode.encoding) + "','length':" + String(selCode.bits) + ",'address':'" + String(selCode.address) + "'}]</pre></li>\n");
+  server.sendContent("            <li>Local IP <span class='label label-default'>JSON</span></li>\n");
+  server.sendContent("            <li><pre>http://" + WiFi.localIP().toString() + ":" + String(port) + "/json?plain=[{'data':'" + String(selCode.data) + "','type':'" + String(selCode.encoding) + "','length':" + String(selCode.bits) + ",'address':'" + String(selCode.address) + "'}]</pre></li>\n");
+  server.sendContent("            <li>External IP <span class='label label-default'>JSON</span></li>\n");
+  server.sendContent("            <li><pre>http://" + externalIP() + ":" + String(port) + "/json?plain=[{'data':'" + String(selCode.data) + "','type':'" + String(selCode.encoding) + "','length':" + String(selCode.bits) + ",'address':'" + String(selCode.address) + "'}]</pre></li></ul>\n");
   } else {
   server.sendContent("      <div class='row'>\n");
   server.sendContent("        <div class='col-md-12'>\n");
@@ -1056,11 +1080,11 @@ void sendCodePage(Code selCode, int httpcode){
   server.sendContent("            <li><pre>http://" + externalIP() + ":" + String(port) + "/msg?code=" + selCode.data + ":" + String(selCode.encoding) + ":" + String(selCode.bits) + "</pre></li></ul>\n");
   server.sendContent("          <ul class='list-unstyled'>\n");
   server.sendContent("            <li>Hostname <span class='label label-default'>JSON</span></li>\n");
-  server.sendContent("            <li><pre>http://" + String(host_name) + ".local:" + String(port) + "/json?plain=[{'data':'" + String(selCode.data) + "', 'type':'" + String(selCode.encoding) + "', 'length':" + String(selCode.bits) + "}]</pre></li>\n");
+  server.sendContent("            <li><pre>http://" + String(host_name) + ".local:" + String(port) + "/json?plain=[{'data':'" + String(selCode.data) + "','type':'" + String(selCode.encoding) + "','length':" + String(selCode.bits) + "}]</pre></li>\n");
   server.sendContent("            <li>Local IP <span class='label label-default'>JSON</span></li>\n");
-  server.sendContent("            <li><pre>http://" + WiFi.localIP().toString() + ":" + String(port) + "/json?plain=[{'data':'" + String(selCode.data) + "', 'type':'" + String(selCode.encoding) + "', 'length':" + String(selCode.bits) + "}]</pre></li>\n");
+  server.sendContent("            <li><pre>http://" + WiFi.localIP().toString() + ":" + String(port) + "/json?plain=[{'data':'" + String(selCode.data) + "','type':'" + String(selCode.encoding) + "','length':" + String(selCode.bits) + "}]</pre></li>\n");
   server.sendContent("            <li>External IP <span class='label label-default'>JSON</span></li>\n");
-  server.sendContent("            <li><pre>http://" + externalIP() + ":" + String(port) + "/json?plain=[{'data':'" + String(selCode.data) + "', 'type':'" + String(selCode.encoding) + "', 'length':" + String(selCode.bits) + "}]</pre></li></ul>\n");
+  server.sendContent("            <li><pre>http://" + externalIP() + ":" + String(port) + "/json?plain=[{'data':'" + String(selCode.data) + "','type':'" + String(selCode.encoding) + "','length':" + String(selCode.bits) + "}]</pre></li></ul>\n");
   }
   server.sendContent("        </div>\n");
   server.sendContent("     </div>\n");
@@ -1087,8 +1111,8 @@ void cvrtCode(Code& codeData, decode_results *results)
     strncpy(codeData.address, ("0x" + String(results->address, HEX)).c_str(), 40);
     strncpy(codeData.command, ("0x" + String(results->command, HEX)).c_str(), 40);
   } else {
-    strncpy(codeData.address, "0x", 40);
-    strncpy(codeData.command, "0x", 40);
+    strncpy(codeData.address, "0x0", 40);
+    strncpy(codeData.command, "0x0", 40);
   }
 }
 
@@ -1097,7 +1121,7 @@ void cvrtCode(Code& codeData, decode_results *results)
 //
 void dumpInfo(decode_results *results) {
   if (results->overflow)
-    Serial.println("WARNING: IR code too long."
+    Serial.println("WARNING: IR code too long. "
                    "Edit IRrecv.h and increase RAWBUF");
 
   // Show Encoding standard
@@ -1217,40 +1241,12 @@ String bin2hex(const uint8_t* bin, const int length) {
 
 
 //+=============================================================================
-// Convert string to hex, borrowed from ESPBasic
-//
-unsigned long HexToLongInt(String h)
-{
-  // this function replace the strtol as this function is not able to handle hex numbers greather than 7fffffff
-  // I'll take char by char converting from hex to char then shifting 4 bits at the time
-  int i;
-  unsigned long tmp = 0;
-  unsigned char c;
-  int s = 0;
-  h.toUpperCase();
-  for (i = h.length() - 1; i >= 0 ; i--)
-  {
-    // take the char starting from the right
-    c = h[i];
-    // convert from hex to int
-    c = c - '0';
-    if (c > 9)
-      c = c - 7;
-    // add and shift of 4 bits per each char
-    tmp += c << s;
-    s += 4;
-  }
-  return tmp;
-}
-
-
-//+=============================================================================
 // Send IR codes to variety of sources
 //
 void irblast(String type, String dataStr, unsigned int len, int rdelay, int pulse, int pdelay, int repeat, long address, IRsend irsend) {
   Serial.println("Blasting off");
   type.toLowerCase();
-  unsigned long data = HexToLongInt(dataStr);
+  unsigned long data = strtoul(("0x" + dataStr).c_str(), 0, 0);
   holdReceive = true;
   Serial.println("Blocking incoming IR signals");
   // Repeat Loop
@@ -1294,6 +1290,8 @@ void irblast(String type, String dataStr, unsigned int len, int rdelay, int puls
         irsend.sendSharpRaw(data, len);
       } else if (type == "rcmm") {
         irsend.sendRCMM(data, len);
+      } else if (type == "gree") {
+        irsend.sendGree(data, len);
       } else if (type == "roomba") {
         roomba_send(atoi(dataStr.c_str()), pulse, pdelay, irsend);
       }
