@@ -19,9 +19,9 @@
 
 // User settings are below here
 
-const bool getExternalIP = true;                              // Set to false to disable querying external IP
+const bool getExternalIP = false;                              // Set to false to disable querying external IP
 
-const bool getTime = true;                                    // Set to false to disable querying for the time
+const bool getTime = false;                                    // Set to false to disable querying for the time
 const int timeOffset = -14400;                                // Timezone offset in seconds
 
 const bool enableMDNSServices = true;                         // Use mDNS services, must be enabled for ArduinoOTA
@@ -1471,5 +1471,5 @@ void loop() {
     digitalWrite(ledpin, LOW);                                    // Turn on the LED for 0.5 seconds
     ticker.attach(0.5, disableLed);
   }
-  delay(200);
+  //delay(200);
 }
